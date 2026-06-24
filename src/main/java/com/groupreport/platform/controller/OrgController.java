@@ -17,7 +17,7 @@ import java.util.List;
  */
 @Tag(name = "组织机构管理", description = "组织机构的增删改查接口")
 @RestController
-@RequestMapping("/org")
+@RequestMapping("/api/org")
 @RequiredArgsConstructor
 public class OrgController {
 

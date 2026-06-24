@@ -2,10 +2,12 @@ package com.groupreport.platform.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.groupreport.platform.common.ResultCode;
 import com.groupreport.platform.dto.ColumnTreeDTO;
 import com.groupreport.platform.dto.DesignerTemplateDTO;
 import com.groupreport.platform.dto.RowTreeDTO;
+import com.groupreport.platform.dto.TemplateQueryDTO;
 import com.groupreport.platform.entity.*;
 import com.groupreport.platform.exception.BusinessException;
 import com.groupreport.platform.mapper.*;
@@ -15,6 +17,8 @@ import com.groupreport.platform.dto.FormulaDTO;
 import com.groupreport.platform.vo.FormulaVO;
 import com.groupreport.platform.vo.ReportDesignerTemplateVO;
 import com.groupreport.platform.vo.ReportDesignerTemplateVO.*;
+import com.groupreport.platform.common.PageResult;
+import com.groupreport.platform.vo.TemplateListItemVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -856,5 +860,35 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
             }
         }
         return count;
+    }
+
+    @Override
+    public PageResult<TemplateListItemVO> listTemplates(TemplateQueryDTO query) {
+        LambdaQueryWrapper<RptTemplate> wrapper = new LambdaQueryWrapper<RptTemplate>()
+                .like(StrUtil.isNotBlank(query.getName()), RptTemplate::getTemplateName, query.getName())
+                .eq(query.getTemplateType() != null, RptTemplate::getTemplateType, query.getTemplateType())
+                .eq(query.getStatus() != null, RptTemplate::getStatus, query.getStatus())
+                .orderByDesc(RptTemplate::getUpdateTime);
+
+        Page<RptTemplate> page = templateMapper.selectPage(
+                new Page<>(query.getCurrent(), query.getSize()), wrapper);
+
+        List<TemplateListItemVO> records = page.getRecords().stream().map(tpl -> {
+            TemplateListItemVO vo = new TemplateListItemVO();
+            vo.setId(tpl.getId());
+            vo.setTemplateCode(tpl.getTemplateCode());
+            vo.setTemplateName(tpl.getTemplateName());
+            vo.setTemplateType(tpl.getTemplateType());
+            vo.setStatus(tpl.getStatus());
+            vo.setVersion(tpl.getVersion());
+            vo.setPeriodType(tpl.getPeriodType());
+            vo.setAuditRequired(tpl.getAuditRequired());
+            vo.setDescription(tpl.getDescription());
+            vo.setCreateTime(tpl.getCreateTime());
+            vo.setUpdateTime(tpl.getUpdateTime());
+            return vo;
+        }).toList();
+
+        return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize());
     }
 }

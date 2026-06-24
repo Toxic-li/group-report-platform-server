@@ -1,9 +1,12 @@
 package com.groupreport.platform.controller;
 
+import com.groupreport.platform.common.PageResult;
 import com.groupreport.platform.common.Result;
 import com.groupreport.platform.dto.DesignerTemplateDTO;
+import com.groupreport.platform.dto.TemplateQueryDTO;
 import com.groupreport.platform.service.*;
 import com.groupreport.platform.vo.ReportDesignerTemplateVO;
+import com.groupreport.platform.vo.TemplateListItemVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,6 +28,12 @@ import org.springframework.web.bind.annotation.*;
 public class ReportDesignerController {
 
     private final ReportDesignerService designerService;
+
+    @Operation(summary = "模板列表（分页）", description = "查询模板列表，支持按名称、类型、状态筛选")
+    @GetMapping("/template/list")
+    public Result<PageResult<TemplateListItemVO>> listTemplates(TemplateQueryDTO query) {
+        return Result.success(designerService.listTemplates(query));
+    }
 
     /**
      * 加载完整模板JSON（设计器打开时调用）

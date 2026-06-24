@@ -1,7 +1,10 @@
 package com.groupreport.platform.service;
 
 import com.groupreport.platform.dto.DesignerTemplateDTO;
+import com.groupreport.platform.dto.TemplateQueryDTO;
+import com.groupreport.platform.common.PageResult;
 import com.groupreport.platform.vo.ReportDesignerTemplateVO;
+import com.groupreport.platform.vo.TemplateListItemVO;
 
 import java.util.List;
 import java.util.Map;
@@ -57,4 +60,9 @@ public interface ReportDesignerService {
      * 预览模板效果
      */
     ReportDesignerTemplateVO.PreviewResult previewTemplate(Long templateId, Long orgId, String period);
+
+    /**
+     * 分页查询模板列表（仅基本信息，不含完整templateJson）
+     */
+    PageResult<TemplateListItemVO> listTemplates(TemplateQueryDTO query);
 }
