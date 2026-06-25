@@ -49,7 +49,7 @@ public class Knife4jConfig {
     public GroupedOpenApi designerApi() {
         return GroupedOpenApi.builder()
                 .group("designer")
-                .pathsToMatch("/api/report-designer/**")
+                .pathsToMatch("/report-designer/**")
                 .build();
     }
 }

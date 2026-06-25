@@ -2,6 +2,7 @@ package com.groupreport.platform.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.groupreport.platform.common.Constants;
 import com.groupreport.platform.common.ResultCode;
 import com.groupreport.platform.dto.*;
@@ -10,6 +11,10 @@ import com.groupreport.platform.entity.RptSubmit;
 import com.groupreport.platform.exception.BusinessException;
 import com.groupreport.platform.mapper.RptDataMapper;
 import com.groupreport.platform.mapper.RptSubmitMapper;
+import com.groupreport.platform.mapper.RptTemplateRowMapper;
+import com.groupreport.platform.mapper.RptTemplateColumnMapper;
+import com.groupreport.platform.entity.RptTemplateRow;
+import com.groupreport.platform.entity.RptTemplateColumn;
 import com.groupreport.platform.service.ReportDataService;
 import com.groupreport.platform.service.ReportTemplateService;
 import com.groupreport.platform.vo.CellValueVO;
@@ -24,6 +29,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,10 +37,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReportDataServiceImpl implements ReportDataService {
+public class ReportDataServiceImpl extends ServiceImpl<RptDataMapper, RptData> implements ReportDataService {
 
     private final RptDataMapper dataMapper;
     private final RptSubmitMapper submitMapper;
+    private final RptTemplateRowMapper rowMapper;
+    private final RptTemplateColumnMapper columnMapper;
     private final ReportTemplateService templateService;
 
     @Override
@@ -158,11 +166,48 @@ public class ReportDataServiceImpl implements ReportDataService {
             return 0;
         }
 
+        log.info("开始批量保存单元格数据: templateId={}, orgId={}, period={}, cellsCount={}",
+                templateId, orgId, period, cells.size());
+
         Long userId = StpUtil.getLoginIdAsLong();
-        int savedCount = 0;
+        List<RptData> insertList = new ArrayList<>();
+        List<RptData> updateList = new ArrayList<>();
 
         for (CellDataDTO cell : cells) {
+            log.debug("处理单元格: rowCode={}, columnCode={}, value={}, dataType={}",
+                    cell.getRowCode(), cell.getColumnCode(), cell.getValue(), cell.getDataType());
 
+            // 根据 rowCode 查询 rowId
+            if (cell.getRowId() == null && StringUtils.hasText(cell.getRowCode())) {
+                RptTemplateRow row = rowMapper.selectOne(
+                        new LambdaQueryWrapper<RptTemplateRow>()
+                                .eq(RptTemplateRow::getTemplateId, templateId)
+                                .eq(RptTemplateRow::getRowCode, cell.getRowCode())
+                );
+                if (row != null) {
+                    cell.setRowId(row.getId());
+                    log.debug("查询到 rowId: {} for rowCode: {}", row.getId(), cell.getRowCode());
+                } else {
+                    log.warn("未找到 rowId for rowCode: {}", cell.getRowCode());
+                }
+            }
+
+            // 根据 columnCode 查询 columnId
+            if (cell.getColumnId() == null && StringUtils.hasText(cell.getColumnCode())) {
+                RptTemplateColumn column = columnMapper.selectOne(
+                        new LambdaQueryWrapper<RptTemplateColumn>()
+                                .eq(RptTemplateColumn::getTemplateId, templateId)
+                                .eq(RptTemplateColumn::getColumnCode, cell.getColumnCode())
+                );
+                if (column != null) {
+                    cell.setColumnId(column.getId());
+                    log.debug("查询到 columnId: {} for columnCode: {}", column.getId(), cell.getColumnCode());
+                } else {
+                    log.warn("未找到 columnId for columnCode: {}", cell.getColumnCode());
+                }
+            }
+
+            // 查询现有数据
             RptData existing = dataMapper.selectOne(
                     new LambdaQueryWrapper<RptData>()
                             .eq(RptData::getTemplateId, templateId)
@@ -173,16 +218,34 @@ public class ReportDataServiceImpl implements ReportDataService {
             );
 
             if (existing != null) {
+                // 更新现有数据
                 updateCellData(existing, cell, userId);
-                dataMapper.updateById(existing);
+                updateList.add(existing);
+                log.debug("更新现有数据: rowCode={}, columnCode={}", cell.getRowCode(), cell.getColumnCode());
             } else {
-                dataMapper.insert(createNewCellData(templateId, orgId, period, cell, userId));
+                // 创建新数据
+                insertList.add(createNewCellData(templateId, orgId, period, cell, userId));
+                log.debug("创建新数据: rowCode={}, columnCode={}", cell.getRowCode(), cell.getColumnCode());
             }
-
-            savedCount++;
         }
 
-        return savedCount;
+        // 批量插入新数据
+        if (!insertList.isEmpty()) {
+            log.info("批量插入 {} 条新数据", insertList.size());
+            saveBatch(insertList);
+        }
+
+        // 批量更新现有数据
+        if (!updateList.isEmpty()) {
+            log.info("批量更新 {} 条数据", updateList.size());
+            updateBatchById(updateList);
+        }
+
+        int totalCount = insertList.size() + updateList.size();
+        log.info("批量保存完成: 插入 {} 条, 更新 {} 条, 总计 {} 条",
+                insertList.size(), updateList.size(), totalCount);
+
+        return totalCount;
     }
 
     @Override
@@ -297,9 +360,36 @@ public class ReportDataServiceImpl implements ReportDataService {
     }
 
     private void updateCellData(RptData data, CellDataDTO cell, Long userId) {
-        data.setValueText(cell.getValueText());
-        data.setValueNumber(cell.getValueNumber());
-        data.setDataType(cell.getDataType());
+        // 设置行ID和列ID
+        if (cell.getRowId() != null) {
+            data.setRowId(cell.getRowId());
+        }
+        if (cell.getColumnId() != null) {
+            data.setColumnId(cell.getColumnId());
+        }
+
+        // 优先使用前端传来的 dataType，否则自动识别
+        if (cell.getDataType() != null) {
+            setDataValueByType(data, cell);
+        } else {
+            identifyAndSetDataValue(data, cell);
+        }
+
+        // 设置公式标记
+        if (StringUtils.hasText(cell.getFormula())) {
+            data.setIsFormula(1);
+        }
+
+        // 设置数据来源（优先使用前端传来的值）
+        if (cell.getSource() != null) {
+            data.setSource(cell.getSource());
+        }
+
+        // 设置备注
+        if (StringUtils.hasText(cell.getRemark())) {
+            data.setRemark(cell.getRemark());
+        }
+
         data.setUpdateBy(userId);
         data.setUpdateTime(LocalDateTime.now());
     }
@@ -311,14 +401,130 @@ public class ReportDataServiceImpl implements ReportDataService {
         data.setTemplateId(templateId);
         data.setOrgId(orgId);
         data.setPeriod(period);
+
+        // 设置行ID和列ID
+        data.setRowId(cell.getRowId());
+        data.setColumnId(cell.getColumnId());
         data.setRowCode(cell.getRowCode());
         data.setColumnCode(cell.getColumnCode());
-        data.setValueText(cell.getValueText());
-        data.setValueNumber(cell.getValueNumber());
-        data.setDataType(cell.getDataType());
+
+        // 优先使用前端传来的 dataType，否则自动识别
+        if (cell.getDataType() != null) {
+            setDataValueByType(data, cell);
+        } else {
+            identifyAndSetDataValue(data, cell);
+        }
+
+        // 设置公式标记
+        if (StringUtils.hasText(cell.getFormula())) {
+            data.setIsFormula(1);
+        }
+
+        // 设置数据来源（优先使用前端传来的值，否则默认为手动录入）
+        data.setSource(cell.getSource() != null ? cell.getSource() : 1);
+
+        // 设置备注
+        if (StringUtils.hasText(cell.getRemark())) {
+            data.setRemark(cell.getRemark());
+        }
+
+        data.setDeleted(0);
         data.setCreateBy(userId);
 
         return data;
+    }
+
+    /**
+     * 根据前端传来的数据类型设置值
+     */
+    private void setDataValueByType(RptData data, CellDataDTO cell) {
+        data.setDataType(cell.getDataType());
+
+        String value = cell.getValue();
+        if (value == null) {
+            value = cell.getRawValue();
+        }
+
+        switch (cell.getDataType()) {
+            case 2: // 数字
+                try {
+                    if (StringUtils.hasText(value)) {
+                        data.setValueNumber(new BigDecimal(value));
+                        data.setValueText(value);
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("数字格式错误: value={}, rowCode={}, columnCode={}",
+                            value, cell.getRowCode(), cell.getColumnCode());
+                }
+                break;
+            case 3: // 日期
+                try {
+                    if (StringUtils.hasText(value)) {
+                        LocalDate dateValue = LocalDate.parse(value);
+                        data.setValueDate(dateValue);
+                        data.setValueText(value);
+                    }
+                } catch (Exception e) {
+                    log.warn("日期格式错误: value={}, rowCode={}, columnCode={}",
+                            value, cell.getRowCode(), cell.getColumnCode());
+                }
+                break;
+            case 1: // 文本
+            default:
+                data.setValueText(value);
+                break;
+        }
+    }
+
+    /**
+     * 自动识别数据类型并设置值
+     */
+    private void identifyAndSetDataValue(RptData data, CellDataDTO cell) {
+        String value = cell.getValue();
+        
+        // 如果value为空，尝试使用valueText或valueNumber
+        if (!StringUtils.hasText(value)) {
+            if (cell.getValueNumber() != null) {
+                // 如果提供了valueNumber，直接使用
+                data.setValueNumber(cell.getValueNumber());
+                data.setDataType(2); // 数字类型
+                data.setValueText(cell.getValueNumber().toString());
+            } else if (StringUtils.hasText(cell.getValueText())) {
+                // 如果提供了valueText，直接使用
+                data.setValueText(cell.getValueText());
+                data.setDataType(1); // 文本类型
+            } else {
+                // 所有值都为空
+                data.setDataType(1);
+            }
+            return;
+        }
+        
+        // 尝试解析为数字
+        try {
+            BigDecimal numberValue = new BigDecimal(value);
+            data.setValueNumber(numberValue);
+            data.setValueText(value);
+            data.setDataType(2); // 数字类型
+            return;
+        } catch (NumberFormatException e) {
+            // 不是数字，继续尝试其他类型
+        }
+        
+        // 尝试解析为日期
+        try {
+            LocalDate dateValue = LocalDate.parse(value);
+            data.setValueDate(dateValue);
+            data.setValueText(value);
+            data.setDataType(3); // 日期类型
+            return;
+        } catch (Exception e) {
+            // 不是日期，作为文本处理
+        }
+        
+        // 默认作为文本处理
+        data.setValueText(value);
+        data.setDataType(1); // 文本类型
     }
 
     private CellValueVO convertToCellValueVO(RptData data) {

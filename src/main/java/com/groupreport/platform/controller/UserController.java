@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Tag(name = "用户管理", description = "用户的增删改查接口")
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
 

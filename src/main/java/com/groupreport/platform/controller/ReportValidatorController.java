@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/report-designer/validators")
+@RequestMapping("/report-designer/validators")
 @RequiredArgsConstructor
 @Tag(name = "校验规则管理", description = "报表校验规则配置与执行接口")
 public class ReportValidatorController {

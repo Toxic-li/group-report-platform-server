@@ -31,24 +31,31 @@ public class RptData implements Serializable {
     private String period;
 
     /** 行结构ID */
+    @TableField("row_id")
     private Long rowId;
 
     /** 行编码 */
+    @TableField("row_code")
     private String rowCode;
 
     /** 列结构ID */
+    @TableField("column_id")
     private Long columnId;
 
     /** 列编码 */
+    @TableField("column_code")
     private String columnCode;
 
     /** 文本值 */
+    @TableField("value_text")
     private String valueText;
 
     /** 数值 */
+    @TableField("value_number")
     private java.math.BigDecimal valueNumber;
 
     /** 日期值 */
+    @TableField("value_date")
     private java.time.LocalDate valueDate;
 
     /** 数据类型：1-文本 2-数字 3-日期 */

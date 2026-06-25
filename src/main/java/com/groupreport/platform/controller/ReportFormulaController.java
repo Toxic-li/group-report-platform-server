@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/report-designer/formulas")
+@RequestMapping("/report-designer/formulas")
 @RequiredArgsConstructor
 @Tag(name = "公式管理", description = "报表公式配置与计算接口（前端Univer对接）")
 public class ReportFormulaController {

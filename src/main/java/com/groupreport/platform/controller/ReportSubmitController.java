@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Tag(name = "报表提交", description = "报表提交审核相关接口")
 @RestController
-@RequestMapping("/api/report-designer/submit")
+@RequestMapping("/report-designer/submit")
 @RequiredArgsConstructor
 public class ReportSubmitController {
 

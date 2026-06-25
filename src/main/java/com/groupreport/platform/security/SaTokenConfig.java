@@ -19,23 +19,23 @@ public class SaTokenConfig implements WebMvcConfigurer {
         registry.addInterceptor(new SaInterceptor(handle -> {
 
             // 登录认证：除登录、注册等接口外，所有接口都需要登录
-//            SaRouter.match("/**")
-//                    .notMatch(
-//                            "/auth/login",
-//                            "/auth/captcha",
-//                            "/doc.html",
-//                            "/swagger-ui/**",
-//                            "/v3/api-docs/**",
-//                            "/webjars/**",
-//                            "/favicon.ico"
-//                    )
-//                    .check(r -> StpUtil.checkLogin());
+            SaRouter.match("/**")
+                    .notMatch(
+                            "/auth/login",
+                            "/auth/captcha",
+                            "/doc.html",
+                            "/swagger-ui/**",
+                            "/v3/api-docs/**",
+                            "/webjars/**",
+                            "/favicon.ico"
+                    )
+                    .check(r -> StpUtil.checkLogin());
 
             // 权限认证：管理员接口需要admin角色
             SaRouter.match("/admin/**").check(r -> StpUtil.checkRole("SUPER_ADMIN"));
 
             // 审核接口需要审核员或管理员权限
-            SaRouter.match("/api/report-designer/audit/**")
+            SaRouter.match("/report-designer/audit/**")
                     .check(r -> StpUtil.checkRoleOr("AUDITOR", "SUPER_ADMIN", "ADMIN"));
 
         })).addPathPatterns("/**");

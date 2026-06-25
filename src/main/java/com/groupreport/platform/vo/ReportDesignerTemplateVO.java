@@ -253,6 +253,9 @@ public class ReportDesignerTemplateVO {
     @Schema(description = "权限配置")
     private PermissionConfig permissions;
 
+    @Schema(description = "单元格数据 Map<rowCode:columnCode, value>")
+    private Map<String, String> cellData;
+
     @Data
     public static class PermissionConfig {
         @Schema(description = "可编辑的组织ID列表")

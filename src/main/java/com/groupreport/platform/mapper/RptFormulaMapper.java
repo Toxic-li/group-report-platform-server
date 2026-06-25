@@ -2,6 +2,7 @@ package com.groupreport.platform.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.groupreport.platform.entity.RptFormula;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -31,4 +32,10 @@ public interface RptFormulaMapper extends BaseMapper<RptFormula> {
      */
     @Select("SELECT * FROM rpt_formula WHERE template_id = #{templateId} AND calc_trigger = #{calcTrigger} AND deleted = 0 AND status = 1 ORDER BY priority ASC")
     List<RptFormula> selectByCalcTrigger(@Param("templateId") Long templateId, @Param("calcTrigger") Integer calcTrigger);
+
+    /**
+     * 物理删除指定模板的所有公式（包括逻辑删除的记录）
+     */
+    @Delete("DELETE FROM rpt_formula WHERE template_id = #{templateId}")
+    void physicalDeleteByTemplateId(@Param("templateId") Long templateId);
 }

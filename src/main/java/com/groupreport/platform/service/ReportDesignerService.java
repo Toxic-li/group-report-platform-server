@@ -22,6 +22,15 @@ public interface ReportDesignerService {
      */
     ReportDesignerTemplateVO loadFullTemplate(Long templateId);
 
+    /**
+     * 加载完整模板JSON（从各表组装），包含单元格数据
+     * @param templateId 模板ID
+     * @param orgId 组织ID（可选，传入时查询对应数据）
+     * @param period 周期（可选，传入时查询对应数据）
+     * @return 完整模板定义（含单元格数据）
+     */
+    ReportDesignerTemplateVO loadFullTemplate(Long templateId, Long orgId, String period);
+
     Long saveTemplate(DesignerTemplateDTO dto);
 
     /**

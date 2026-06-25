@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/report-designer/conditional-formats")
+@RequestMapping("/report-designer/conditional-formats")
 @RequiredArgsConstructor
 @Tag(name = "条件格式管理", description = "报表条件格式配置与评估接口")
 public class ReportConditionalFormatController {

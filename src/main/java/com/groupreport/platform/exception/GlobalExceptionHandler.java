@@ -2,6 +2,7 @@ package com.groupreport.platform.exception;
 
 import com.groupreport.platform.common.Result;
 import com.groupreport.platform.common.ResultCode;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -80,8 +81,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<Void> handleException(Exception e) {
+    public Result<?> handleException(HttpServletRequest request, Exception e) {
+
+        log.error("请求路径: {}", request.getRequestURI());
         log.error("系统异常", e);
-        return Result.error("系统内部错误，请联系管理员");
+
+        return Result.error(e.getMessage());
     }
 }

@@ -17,7 +17,7 @@ import java.util.List;
  */
 @Tag(name = "角色管理", description = "角色的增删改查接口")
 @RestController
-@RequestMapping("/api/role")
+@RequestMapping("/role")
 @RequiredArgsConstructor
 public class RoleController {
 

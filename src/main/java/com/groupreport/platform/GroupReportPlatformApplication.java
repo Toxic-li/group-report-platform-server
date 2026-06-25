@@ -28,8 +28,8 @@ public class GroupReportPlatformApplication {
         SpringApplication.run(GroupReportPlatformApplication.class, args);
         System.out.println("========================================");
         System.out.println("  集团统计报表平台启动成功！");
-        System.out.println("  接口文档地址: http://localhost:8080/api/doc.html");
-        System.out.println("  Swagger文档: http://localhost:8080/api/swagger-ui.html");
+        System.out.println("  接口文档地址: http://localhost:8080/doc.html");
+        System.out.println("  Swagger文档: http://localhost:8080/swagger-ui.html");
         System.out.println("========================================");
     }
 }

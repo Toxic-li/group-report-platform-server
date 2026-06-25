@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/report-designer")
+@RequestMapping("/report-designer")
 @RequiredArgsConstructor
 @Tag(name = "报表设计器", description = "低代码报表设计器统一JSON接口（前端Univer对接核心）")
 public class ReportDesignerController {
@@ -38,12 +38,16 @@ public class ReportDesignerController {
     /**
      * 加载完整模板JSON（设计器打开时调用）
      * 返回结构：{ id, name, code, version, status, layout, rowTree, columnTree,
-     *            metrics, aggregates, validators, conditionalFormats, dataSource }
+     *            metrics, aggregates, validators, conditionalFormats, dataSource, cellData }
      */
-    @Operation(summary = "加载完整模板JSON", description = "一次请求获取模板全部配置，供设计器渲染")
+    @Operation(summary = "加载完整模板JSON", description = "一次请求获取模板全部配置，供设计器渲染。可选传入orgId和period获取单元格数据")
     @GetMapping("/template/{templateId}")
-    public Result<ReportDesignerTemplateVO> loadTemplate(@PathVariable Long templateId) {
-        ReportDesignerTemplateVO vo = designerService.loadFullTemplate(templateId);
+    public Result<ReportDesignerTemplateVO> loadTemplate(
+            @PathVariable Long templateId,
+            @RequestParam(required = false) Long orgId,
+            @RequestParam(required = false) String period) {
+        log.info("加载模板: templateId={}, orgId={}, period={}", templateId, orgId, period);
+        ReportDesignerTemplateVO vo = designerService.loadFullTemplate(templateId, orgId, period);
         return Result.success(vo);
     }
 

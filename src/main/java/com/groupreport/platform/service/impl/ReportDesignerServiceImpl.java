@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -178,13 +179,17 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
 
     // ==================== 核心方法：加载完整模板JSON ====================
 
-    /**
-     * 从各关系表组装完整模板JSON
-     * 前端调用一次即可获取设计器所需全部数据
-     */
     @Override
     public ReportDesignerTemplateVO loadFullTemplate(Long templateId) {
-        log.info("加载完整模板JSON: templateId={}", templateId);
+        return loadFullTemplate(templateId, null, null);
+    }
+
+    /**
+     * 从各关系表组装完整模板JSON，支持查询单元格数据
+     */
+    @Override
+    public ReportDesignerTemplateVO loadFullTemplate(Long templateId, Long orgId, String period) {
+        log.info("加载完整模板JSON: templateId={}, orgId={}, period={}", templateId, orgId, period);
 
         // 1. 模板基础信息
         RptTemplate tpl = templateMapper.selectById(templateId);
@@ -238,10 +243,31 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
         // 10. 权限配置
         vo.setPermissions(buildPermissionConfig(tpl));
 
-        log.info("模板加载完成: id={}, name={}, rows={}, cols={}, metrics={}, validators={}, formats={}",
+        // 11. 单元格数据（如果传入了orgId和period）
+        if (orgId != null && orgId > 0 && period != null && !period.isEmpty()) {
+            vo.setCellData(loadCellDataForPreview(templateId, orgId, period));
+        } else {
+            // 如果没有传入orgId和period，尝试查询最近的数据
+            log.info("未传入orgId和period，尝试查询最近的数据");
+            RptData recentData = dataMapper.selectOne(
+                    new LambdaQueryWrapper<RptData>()
+                            .eq(RptData::getTemplateId, templateId)
+                            .orderByDesc(RptData::getUpdateTime)
+                            .last("LIMIT 1")
+            );
+            if (recentData != null) {
+                log.info("找到最近的数据: orgId={}, period={}", recentData.getOrgId(), recentData.getPeriod());
+                vo.setCellData(loadCellDataForPreview(templateId, recentData.getOrgId(), recentData.getPeriod()));
+            } else {
+                log.info("未找到任何数据");
+            }
+        }
+
+        log.info("模板加载完成: id={}, name={}, rows={}, cols={}, metrics={}, validators={}, formats={}, cellDataSize={}",
                 templateId, vo.getName(),
                 allRows.size(), allCols.size(),
-                formulaVOs.size(), vo.getValidators().size(), vo.getConditionalFormats().size());
+                formulaVOs.size(), vo.getValidators().size(), vo.getConditionalFormats().size(),
+                vo.getCellData() != null ? vo.getCellData().size() : 0);
 
         return vo;
     }
@@ -682,7 +708,7 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
         for (TreeNode node : tree) {
             RptTemplateColumn col = new RptTemplateColumn();
             col.setColumnCode(node.getId());
-            col.setColumnName(node.getName());
+            col.setColumnName(StrUtil.isNotBlank(node.getName()) ? node.getName() : node.getId());
             col.setParentId(parentId);
             col.setSortOrder(orderCounter[0]++);
             col.setWidth(node.getWidth());
@@ -747,15 +773,12 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
     }
 
     private void deleteSubData(Long templateId) {
-        // 删除行
-        rowMapper.delete(new LambdaQueryWrapper<RptTemplateRow>().eq(RptTemplateRow::getTemplateId, templateId));
-        // 删除列
-        columnMapper.delete(new LambdaQueryWrapper<RptTemplateColumn>().eq(RptTemplateColumn::getTemplateId, templateId));
-        // 公式通过service删除
-        LambdaQueryWrapper<com.groupreport.platform.entity.RptFormula> fw =
-                new LambdaQueryWrapper<com.groupreport.platform.entity.RptFormula>()
-                        .eq(com.groupreport.platform.entity.RptFormula::getTemplateId, templateId);
-        formulaMapper.delete(fw);
+        // 删除行（使用物理删除，避免唯一键冲突）
+        rowMapper.physicalDeleteByTemplateId(templateId);
+        // 删除列（使用物理删除，避免唯一键冲突）
+        columnMapper.physicalDeleteByTemplateId(templateId);
+        // 公式通过service删除（使用物理删除，避免潜在冲突）
+        formulaMapper.physicalDeleteByTemplateId(templateId);
     }
 
     private void validateTemplateCompleteness(Long templateId) {
@@ -775,14 +798,29 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
     }
 
     private Map<String, String> loadCellDataForPreview(Long templateId, Long orgId, String period) {
+        log.info("查询单元格数据: templateId={}, orgId={}, period={}", templateId, orgId, period);
+
         LambdaQueryWrapper<RptData> wrapper = new LambdaQueryWrapper<RptData>()
                 .eq(RptData::getTemplateId, templateId)
                 .eq(RptData::getOrgId, orgId)
                 .eq(RptData::getPeriod, period);
+
         List<RptData> dataList = dataMapper.selectList(wrapper);
+        log.info("查询到 {} 条单元格数据", dataList.size());
+
         Map<String, String> map = new HashMap<>();
         for (RptData d : dataList) {
-            map.put(d.getRowCode() + ":" + d.getColumnCode(), d.getValueText());
+            String value;
+            if (d.getDataType() != null && d.getDataType() == 2 && d.getValueNumber() != null) {
+                value = d.getValueNumber().toString();
+            } else if (d.getDataType() != null && d.getDataType() == 3 && d.getValueDate() != null) {
+                value = d.getValueDate().toString();
+            } else {
+                value = d.getValueText();
+            }
+            String key = d.getRowCode() + ":" + d.getColumnCode();
+            map.put(key, value);
+            log.debug("单元格数据: key={}, value={}, dataType={}", key, value, d.getDataType());
         }
         return map;
     }

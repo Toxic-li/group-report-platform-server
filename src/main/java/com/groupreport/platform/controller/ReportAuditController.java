@@ -15,7 +15,7 @@ import java.util.List;
  */
 @Tag(name = "报表审核", description = "报表审核通过/驳回接口")
 @RestController
-@RequestMapping("/api/report-designer/audit")
+@RequestMapping("/report-designer/audit")
 @RequiredArgsConstructor
 public class ReportAuditController {
 

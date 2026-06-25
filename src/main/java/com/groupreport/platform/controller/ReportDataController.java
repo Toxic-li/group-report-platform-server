@@ -15,11 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 报表数据控制器（统一入口：/api/report-designer/data）
+ * 报表数据控制器（统一入口：/report-designer/data）
  */
 @Tag(name = "报表数据", description = "报表数据的填报、保存、查询接口")
 @RestController
-@RequestMapping("/api/report-designer/data")
+@RequestMapping("/report-designer/data")
 @RequiredArgsConstructor
 public class ReportDataController {
 

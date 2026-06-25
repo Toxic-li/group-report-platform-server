@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/report-designer/data-sources")
+@RequestMapping("/report-designer/data-sources")
 @RequiredArgsConstructor
 @Tag(name = "数据源管理", description = "数据源配置与查询接口")
 public class DataSourceController {
