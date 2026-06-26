@@ -39,7 +39,9 @@ E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\conf
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\dto\LoginDTO.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\mapper\RptTemplateMapper.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\service\impl\ReportTemplateServiceImpl.java
+E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\vo\TemplateListItemVO.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\service\impl\ReportDesignerServiceImpl.java
+E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\config\JacksonConfig.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\controller\RoleController.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\mapper\SysRoleMapper.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\mapper\SysUserMapper.java
@@ -96,6 +98,7 @@ E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\dto\
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\dto\ValidatorDTO.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\controller\ReportFormulaController.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\service\ReportFormulaService.java
+E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\dto\TemplateQueryDTO.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\service\impl\ReportSubmitServiceImpl.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\dto\ReportDataSaveDTO.java
 E:\Projects\报表\GroupReportPlatform\src\main\java\com\groupreport\platform\vo\ValidatorVO.java

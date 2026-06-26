@@ -108,8 +108,8 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
 
             row.setTemplateId(templateId);
 
-            // 前端 id -> row_code
-            row.setRowCode(node.getId());
+            // 前端 code -> row_code (优先使用 code，否则使用 id)
+            row.setRowCode(StrUtil.isNotBlank(node.getCode()) ? node.getCode() : node.getId());
 
             // 前端 name -> row_name
             row.setRowName(node.getName());
@@ -117,6 +117,9 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
             row.setParentId(parentId);
             row.setSortOrder(sort++);
             row.setLevel(node.getLevel() == null ? 1 : node.getLevel());
+
+            // 是否小计行
+            row.setIsSummary(Boolean.TRUE.equals(node.getIsSummary()) ? 1 : 0);
 
             row.setVisible(1);
 
@@ -141,11 +144,11 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
 
             col.setTemplateId(templateId);
 
-            // 前端 id -> column_code
-            col.setColumnCode(node.getId());
+            // 前端 code -> column_code (优先使用 code，否则使用 id)
+            col.setColumnCode(StrUtil.isNotBlank(node.getCode()) ? node.getCode() : node.getId());
 
-            // 前端 title -> column_name（关键修复点）
-            col.setColumnName(node.getTitle());
+            // 前端 name -> column_name (优先使用 name，否则使用 title)
+            col.setColumnName(StrUtil.isNotBlank(node.getName()) ? node.getName() : node.getTitle());
 
             col.setColumnType("data".equals(node.getType()) ? 1 : 2);
 
@@ -479,33 +482,52 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
     private <T> List<TreeNode> buildTreeNodes(List<T> entities, boolean isRow) {
         if (entities == null || entities.isEmpty()) return List.of();
 
-        // 将实体转为TreeNode
+        // 将实体转为TreeNode，并保存数据库ID用于构建父子关系
         List<TreeNode> nodes = new ArrayList<>();
+        // 使用Map保存：数据库ID -> TreeNode，用于建立父子关系
+        Map<Long, TreeNode> dbIdMap = new LinkedHashMap<>();
+        
         for (T entity : entities) {
-            TreeNode node = isRow ?
-                    rowToTreeNode((RptTemplateRow) entity) :
-                    columnToTreeNode((RptTemplateColumn) entity);
-            nodes.add(node);
+            if (isRow) {
+                RptTemplateRow row = (RptTemplateRow) entity;
+                TreeNode node = rowToTreeNode(row);
+                nodes.add(node);
+                // 保存数据库ID和TreeNode的映射
+                if (row.getId() != null) {
+                    dbIdMap.put(row.getId(), node);
+                }
+            } else {
+                RptTemplateColumn col = (RptTemplateColumn) entity;
+                TreeNode node = columnToTreeNode(col);
+                nodes.add(node);
+                // 保存数据库ID和TreeNode的映射
+                if (col.getId() != null) {
+                    dbIdMap.put(col.getId(), node);
+                }
+            }
         }
 
-        // 构建树（parentId匹配）
-        Map<String, TreeNode> nodeMap = new LinkedHashMap<>();
-        for (TreeNode n : nodes) {
-            nodeMap.put(n.getId(), n);
-        }
+        // 构建树：使用数据库ID建立父子关系
         List<TreeNode> roots = new ArrayList<>();
         for (TreeNode n : nodes) {
-            if (n.getParentId() == null || "0".equals(n.getParentId()) || "root".equals(n.getParentId())) {
+            String parentIdStr = n.getParentId();
+            if (parentIdStr == null || "0".equals(parentIdStr) || "root".equals(parentIdStr)) {
                 roots.add(n);
             } else {
-                TreeNode parent = nodeMap.get(n.getParentId());
-                if (parent != null) {
-                    if (parent.getChildren() == null) {
-                        parent.setChildren(new ArrayList<>());
+                try {
+                    Long parentId = Long.parseLong(parentIdStr);
+                    TreeNode parent = dbIdMap.get(parentId);
+                    if (parent != null) {
+                        if (parent.getChildren() == null) {
+                            parent.setChildren(new ArrayList<>());
+                        }
+                        parent.getChildren().add(n);
+                    } else {
+                        roots.add(n); // 找不到父节点，作为根
                     }
-                    parent.getChildren().add(n);
-                } else {
-                    roots.add(n); // 找不到父节点，作为根
+                } catch (NumberFormatException e) {
+                    // 如果parentId不是数字格式，作为根节点处理
+                    roots.add(n);
                 }
             }
         }
@@ -658,17 +680,16 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
     @SuppressWarnings("unchecked")
     private void saveRowTree(Long templateId, List<TreeNode> tree) {
         if (tree == null || tree.isEmpty()) return;
-        List<RptTemplateRow> flatList = flattenRowTree(tree, null, 0, new int[1]);
-        for (RptTemplateRow row : flatList) {
-            row.setTemplateId(templateId);
-            rowMapper.insert(row);
-        }
+        saveRowTreeRecursive(templateId, tree, null, 0, new int[1]);
     }
 
-    private List<RptTemplateRow> flattenRowTree(List<TreeNode> tree, Long parentId, int level, int[] orderCounter) {
-        List<RptTemplateRow> result = new ArrayList<>();
+    /**
+     * 递归保存行树（边创建边插入，确保 parentId 正确）
+     */
+    private void saveRowTreeRecursive(Long templateId, List<TreeNode> tree, Long parentId, int level, int[] orderCounter) {
         for (TreeNode node : tree) {
             RptTemplateRow row = new RptTemplateRow();
+            row.setTemplateId(templateId);
             row.setRowCode(node.getId());
             row.setRowName(node.getName());
             row.setRowType(mapRowTypeToInt(node.getType()));
@@ -683,30 +704,31 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
             row.setFontBold(null); // 预留
             row.setVisible(Boolean.FALSE.equals(node.getVisible()) ? 0 : 1);
             row.setFrozen(Boolean.TRUE.equals(node.getFrozen()) ? 1 : 0);
-            result.add(row);
 
+            // 先插入，获取自动生成的 ID
+            rowMapper.insert(row);
+            Long currentId = row.getId();
+
+            // 递归处理子节点，使用当前行的 ID 作为 parentId
             if (node.getChildren() != null && !node.getChildren().isEmpty()) {
-                Long currentId = row.getId();
-                result.addAll(flattenRowTree(node.getChildren(), currentId, level + 1, orderCounter));
+                saveRowTreeRecursive(templateId, node.getChildren(), currentId, level + 1, orderCounter);
             }
         }
-        return result;
     }
 
     @SuppressWarnings("unchecked")
     private void saveColumnTree(Long templateId, List<TreeNode> tree) {
         if (tree == null || tree.isEmpty()) return;
-        List<RptTemplateColumn> flatList = flattenColTree(tree, null, 0, new int[1]);
-        for (RptTemplateColumn col : flatList) {
-            col.setTemplateId(templateId);
-            columnMapper.insert(col);
-        }
+        saveColumnTreeRecursive(templateId, tree, null, 0, new int[1]);
     }
 
-    private List<RptTemplateColumn> flattenColTree(List<TreeNode> tree, Long parentId, int level, int[] orderCounter) {
-        List<RptTemplateColumn> result = new ArrayList<>();
+    /**
+     * 递归保存列树（边创建边插入，确保 parentId 正确）
+     */
+    private void saveColumnTreeRecursive(Long templateId, List<TreeNode> tree, Long parentId, int level, int[] orderCounter) {
         for (TreeNode node : tree) {
             RptTemplateColumn col = new RptTemplateColumn();
+            col.setTemplateId(templateId);
             col.setColumnCode(node.getId());
             col.setColumnName(StrUtil.isNotBlank(node.getName()) ? node.getName() : node.getId());
             col.setParentId(parentId);
@@ -725,14 +747,16 @@ public class ReportDesignerServiceImpl implements ReportDesignerService {
             col.setAlign(mapAlignToInt(node.getAlign()));
             col.setVisible(Boolean.FALSE.equals(node.getVisible()) ? 0 : 1);
             col.setFrozen(Boolean.TRUE.equals(node.getFrozen()) ? 1 : 0);
-            result.add(col);
 
+            // 先插入，获取自动生成的 ID
+            columnMapper.insert(col);
+            Long currentId = col.getId();
+
+            // 递归处理子节点，使用当前列的 ID 作为 parentId
             if (node.getChildren() != null && !node.getChildren().isEmpty()) {
-                Long currentId = col.getId();
-                result.addAll(flattenColTree(node.getChildren(), currentId, level + 1, orderCounter));
+                saveColumnTreeRecursive(templateId, node.getChildren(), currentId, level + 1, orderCounter);
             }
         }
-        return result;
     }
 
     private void saveMetrics(Long templateId, List<MetricDef> metrics) {

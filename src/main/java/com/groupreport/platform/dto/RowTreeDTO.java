@@ -14,7 +14,13 @@ public class RowTreeDTO {
 
     private String name;
 
+    private String code;
+
     private Integer level;
+
+    private Boolean isSummary;
+
+    private String summaryType;
 
     private List<RowTreeDTO> children;
 }

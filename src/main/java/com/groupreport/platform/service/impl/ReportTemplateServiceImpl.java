@@ -339,7 +339,9 @@ public class ReportTemplateServiceImpl
             RowTreeDTO dto = new RowTreeDTO();
             dto.setId(String.valueOf(row.getId()));
             dto.setName(row.getRowName());
+            dto.setCode(row.getRowCode());
             dto.setLevel(row.getLevel());
+            dto.setIsSummary(row.getIsSummary() != null && row.getIsSummary() == 1);
 
             map.put(row.getId(), dto); // ✅ Long key
         }
@@ -386,7 +388,9 @@ public class ReportTemplateServiceImpl
         for (RptTemplateColumn col : list) {
             ColumnTreeDTO dto = new ColumnTreeDTO();
             dto.setId(String.valueOf(col.getId()));
+            dto.setName(col.getColumnName());
             dto.setTitle(col.getColumnName());
+            dto.setCode(col.getColumnCode());
             dto.setType(String.valueOf(col.getColumnType()));
             dto.setWidth(col.getWidth());
             dto.setAlign(String.valueOf(col.getAlign()));
